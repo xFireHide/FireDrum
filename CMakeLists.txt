@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(BateriaEletronica VERSION 1.0.0 LANGUAGES C CXX)
+project(FireKit VERSION 1.0.0 LANGUAGES C CXX)
 
 # C++20 para concepts/atomics modernos; sem extensões de compilador.
 set(CMAKE_CXX_STANDARD 20)
@@ -24,24 +24,24 @@ else()
 endif()
 
 # --- App standalone ---------------------------------------------------------
-juce_add_gui_app(BateriaEletronica
-    PRODUCT_NAME "Bateria Eletronica"
+juce_add_gui_app(FireKit
+    PRODUCT_NAME "FireKit"
     COMPANY_NAME "SomBateria")
 
-target_sources(BateriaEletronica PRIVATE
+target_sources(FireKit PRIVATE
     Source/Main.cpp
     Source/SerialSource.cpp)
 
 # Headers-only (template-heavy) ficam visíveis pela pasta Source.
-target_include_directories(BateriaEletronica PRIVATE Source)
+target_include_directories(FireKit PRIVATE Source)
 
-target_compile_definitions(BateriaEletronica PRIVATE
+target_compile_definitions(FireKit PRIVATE
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
-    JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:BateriaEletronica,JUCE_PRODUCT_NAME>"
-    JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:BateriaEletronica,JUCE_VERSION>")
+    JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:FireKit,JUCE_PRODUCT_NAME>"
+    JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:FireKit,JUCE_VERSION>")
 
-target_link_libraries(BateriaEletronica PRIVATE
+target_link_libraries(FireKit PRIVATE
     juce::juce_audio_utils      # devices + formats + basics + gui
     juce::juce_audio_devices
     juce::juce_audio_formats

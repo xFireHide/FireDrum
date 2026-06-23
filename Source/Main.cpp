@@ -1699,15 +1699,15 @@ private:
 };
 
 //==============================================================================
-class BateriaApplication final : public juce::JUCEApplication
+class FireKitApplication final : public juce::JUCEApplication
 {
 public:
-    const juce::String getApplicationName() override    { return "SomBateria"; }
+    const juce::String getApplicationName() override    { return "FireKit"; }
     const juce::String getApplicationVersion() override { return "3.0.0"; }
 
     void initialise (const juce::String&) override
     {
-        mainWindow = std::make_unique<MainWindow> (juce::String());
+        mainWindow = std::make_unique<MainWindow> ("FireKit");
     }
     void shutdown() override { mainWindow = nullptr; }
 
@@ -1732,4 +1732,4 @@ private:
     std::unique_ptr<MainWindow> mainWindow;
 };
 
-START_JUCE_APPLICATION (BateriaApplication)
+START_JUCE_APPLICATION (FireKitApplication)

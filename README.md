@@ -1,4 +1,4 @@
-# SomBateria
+# FireKit
 
 Software **standalone** de bateria eletrônica que lê os sinais do Arduino
 **direto da porta serial** e toca os sons na placa de áudio — **sem MIDI virtual
