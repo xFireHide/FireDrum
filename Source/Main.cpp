@@ -92,48 +92,62 @@ public:
 class MidiMonitor final : public juce::Component
 {
 public:
-    MidiMonitor() = default;
+    MidiMonitor()
+    {
+        // TextEditor read-only multilinha: scroll (barra + roda do mouse) e
+        // seleção/cópia (Cmd+C, menu de contexto) nativos, de graça.
+        editor.setMultiLine (true, false);
+        editor.setReadOnly (true);
+        editor.setCaretVisible (false);
+        editor.setScrollbarsShown (true);
+        editor.setPopupMenuEnabled (true);          // menu: Copiar / Selecionar tudo
+        editor.setFont (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), 12.0f, juce::Font::plain));
+        editor.setColour (juce::TextEditor::backgroundColourId,      juce::Colour (0xff0b0b0e));
+        editor.setColour (juce::TextEditor::outlineColourId,         juce::Colour (0xff2a2c34));
+        editor.setColour (juce::TextEditor::focusedOutlineColourId,  juce::Colour (0xff3a3c46));
+        editor.setColour (juce::TextEditor::shadowColourId,          juce::Colours::transparentBlack);
+        editor.setTextToShowWhenEmpty ("Aguardando MIDI da serial... bata num pad.",
+                                       juce::Colour (0xff55555f));
+        addAndMakeVisible (editor);
+    }
 
     void addLine (juce::String text, juce::Colour colour)
     {
         lines.push_back ({ std::move (text), colour });
-        while ((int) lines.size() > maxLines) lines.pop_front();
-        repaint();
+        // Poda em lote (raro): evita reconstruir o editor a cada linha.
+        if ((int) lines.size() > maxLines + trimBatch) { rebuild(); return; }
+        appendLine (lines.back());
     }
-    void clear() { lines.clear(); repaint(); }
 
-    void paint (juce::Graphics& g) override
-    {
-        auto r = getLocalBounds();
-        g.setColour (juce::Colour (0xff0b0b0e));
-        g.fillRoundedRectangle (r.toFloat(), 6.0f);
-        g.setColour (juce::Colour (0xff2a2c34));
-        g.drawRoundedRectangle (r.toFloat().reduced (0.5f), 6.0f, 1.0f);
+    void clear() { lines.clear(); editor.clear(); }
 
-        g.setFont (juce::FontOptions (juce::Font::getDefaultMonospacedFontName(), 12.0f, juce::Font::plain));
-        const int lineH = 15, padX = 10;
-        const int visible = juce::jmax (1, (r.getHeight() - 6) / lineH);
-        const int first = juce::jmax (0, (int) lines.size() - visible);
-        int y = r.getBottom() - lineH - 2;
-        for (int i = (int) lines.size() - 1; i >= first; --i)
-        {
-            g.setColour (lines[(size_t) i].colour);
-            g.drawText (lines[(size_t) i].text, padX, y, r.getWidth() - padX * 2, lineH,
-                        juce::Justification::centredLeft, true);
-            y -= lineH;
-        }
-        if (lines.empty())
-        {
-            g.setColour (juce::Colour (0xff55555f));
-            g.drawText ("Aguardando MIDI da serial... bata num pad.",
-                        r.reduced (10), juce::Justification::centred, true);
-        }
-    }
+    /** Todo o texto do monitor (pro botão Copiar). */
+    juce::String getAllText() const { return editor.getText(); }
+
+    void resized() override { editor.setBounds (getLocalBounds()); }
 
 private:
     struct Line { juce::String text; juce::Colour colour; };
+
+    void appendLine (const Line& l)
+    {
+        editor.moveCaretToEnd();
+        editor.setColour (juce::TextEditor::textColourId, l.colour);
+        editor.insertTextAtCaret (l.text + juce::newLine);   // cor por linha preservada
+        editor.moveCaretToEnd();                             // autoscroll p/ o fim
+    }
+
+    void rebuild()
+    {
+        while ((int) lines.size() > maxLines) lines.pop_front();
+        editor.clear();
+        for (auto& l : lines) appendLine (l);
+    }
+
+    juce::TextEditor editor;
     std::deque<Line> lines;
-    static constexpr int maxLines = 500;
+    static constexpr int maxLines  = 500;
+    static constexpr int trimBatch = 100;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MidiMonitor)
 };
 
@@ -443,7 +457,7 @@ private:
         float cx = 0.5f, cy = 0.5f, w = 0.16f, h = 0.16f;
         int   note = 38, sound = 38;
         float volume = 0.8f;
-        float sensitivity = 0.6f;
+        float sensitivity = 1.5f;   // expoente da curva de velocity (>1 = mais dinâmica)
         bool  enabled = true, mute = false;
         float flash = 0.0f;
         juce::File sampleFile;
@@ -980,15 +994,22 @@ public:
         audioBtn.onClick = [this] { openAudioSettings(); };
         addAndMakeVisible (audioBtn);
 
+        hwBtn.setButtonText ("Config Hardware");
+        hwBtn.setColour (juce::TextButton::buttonColourId, juce::Colour (0xff3a4a6a));
+        hwBtn.onClick = [this] { openHardwareConfig(); };
+        addAndMakeVisible (hwBtn);
+
         setupSlider (master, 0.0, 1.0, 0.001, 0.8);
         master.onValueChange = [this] { engine.setMasterGain ((float) master.getValue()); configDirty = true; };
         // 'sens' agora é POR-PEÇA (sensibilidade/resposta da velocity do pad selecionado).
-        setupSlider (sens, 0.3, 1.0, 0.01, 0.6);
+        // Expoente da curva de velocity: <1 comprime (tudo soa igual), >1 expande
+        // (forte MUITO mais alto que fraco). 1.5 = dinâmica clara; 3.0 = bem dramático.
+        setupSlider (sens, 0.3, 3.0, 0.01, 1.5);
         sens.onValueChange = [this] { onPieceEdit(); };
 
         makeLabel (kitLbl, "Kit");
         makeLabel (masterLbl, "Vol");
-        makeLabel (sensLbl, "Sensibilidade do pad");
+        makeLabel (sensLbl, "Dinamica (fraco <-> forte)");
         makeLabel (pieceHdr, "PECA SELECIONADA");
         pieceHdr.setColour (juce::Label::textColourId, juce::Colour (0xfff0a830));
 
@@ -1048,6 +1069,10 @@ public:
         clearBtn.setButtonText ("Limpar");
         clearBtn.onClick = [this] { monitor.clear(); };
         addAndMakeVisible (clearBtn);
+
+        copyBtn.setButtonText ("Copiar");
+        copyBtn.onClick = [this] { juce::SystemClipboard::copyTextToClipboard (monitor.getAllText()); };
+        addAndMakeVisible (copyBtn);
         addAndMakeVisible (monitor);
 
         // --- Kit view ---
@@ -1075,8 +1100,11 @@ public:
         kitView.applyAllToEngine();   // aplica atomics + samples (1 rebuild)
 
         loadConfig();                 // sobrescreve com a config salva
-        // (sync de hardware desligado por enquanto: o Arduino usa a config dele.
-        //  Reativar quando o painel de Config Hardware voltar à UI.)
+        // NÃO sincroniza hardware no startup: abrir a porta RESETA o Arduino (DTR),
+        // e disparar comandos 'C' durante o boot corrompe a EEPROM (config bagunçada,
+        // pads re-habilitados, ruído). A EEPROM da placa é a fonte da verdade; ela
+        // persiste sozinha. A config só é enviada quando o usuário mexe no painel
+        // Config Hardware (sendPadConfig ao vivo, fora da janela de reset).
 
         // Inspector ROLÁVEL: move os controles para um content dentro de um Viewport,
         // pra nenhuma linha (ex.: Sensibilidade) ser cortada se a janela for baixa.
@@ -1134,6 +1162,7 @@ public:
         kitLbl.setBounds (bar.removeFromLeft (28));
         kitBox.setBounds (bar.removeFromLeft (150)); bar.removeFromLeft (14);
         audioBtn.setBounds (bar.removeFromLeft (130)); bar.removeFromLeft (8);
+        hwBtn.setBounds (bar.removeFromLeft (130)); bar.removeFromLeft (8);
         samplesBtn.setBounds (bar.removeFromLeft (190)); bar.removeFromLeft (14);
         masterLbl.setBounds (bar.removeFromLeft (44));
         master.setBounds (bar.removeFromLeft (juce::jmin (260, bar.getWidth())));
@@ -1143,6 +1172,8 @@ public:
         auto monHeader = mon.removeFromTop (20);
         monitorLbl.setBounds (monHeader.removeFromLeft (160));
         clearBtn.setBounds (monHeader.removeFromRight (78).withHeight (20));
+        monHeader.removeFromRight (6);
+        copyBtn.setBounds (monHeader.removeFromRight (78).withHeight (20));
         monitor.setBounds (mon);
 
         // Inspector à direita (rola SÓ se precisar; altura do conteúdo = a real).
@@ -1385,6 +1416,21 @@ private:
         }
     }
 
+    /** Qual pad físico (A0-A5) emitiu esta nota. A nota é só o ID de roteamento
+        pad->software; o que importa pro usuário é o pad. -1 = nota sem pad mapeado. */
+    int padForNote (int note) const
+    {
+        for (int p = 0; p < 6; ++p) if (hw[p][4] == note && hw[p][6]) return p;
+        for (int p = 0; p < 6; ++p) if (hw[p][4] == note)             return p;
+        return -1;
+    }
+
+    static const char* padName (int p)
+    {
+        static const char* n[6] = { "caixa", "bumbo", "chimbal", "tom1", "tom2", "crash" };
+        return juce::isPositiveAndBelow (p, 6) ? n[p] : "?";
+    }
+
     void openAudioSettings()
     {
         auto selector = std::make_unique<juce::AudioDeviceSelectorComponent> (
@@ -1586,14 +1632,17 @@ private:
             MidiLogEvent ev;
             while (lq->pop (ev))
             {
+                if (! ev.noteOn) continue;   // pad é one-shot: só a batida interessa
                 const double secs = (double) (ev.timeMs - appStartMs) / 1000.0;
+                const int pad = padForNote (ev.note);
+                const juce::String who = pad >= 0
+                    ? "Pad " + juce::String (pad) + "  " + padName (pad)
+                    : "nota " + juce::String (ev.note);   // fallback: pad desconhecido
                 juce::String line;
-                line << juce::String (secs, 3).paddedLeft (' ', 9) << "s  "
-                     << (ev.noteOn ? "Note On  " : "Note Off ")
-                     << "ch10  nota " << juce::String (ev.note).paddedLeft (' ', 3)
-                     << " " << gmDrumName (ev.note).paddedRight (' ', 16);
-                if (ev.noteOn) line << " vel " << juce::String (ev.velocity).paddedLeft (' ', 3);
-                monitor.addLine (line, ev.noteOn ? juce::Colour (0xff5fd75f) : juce::Colour (0xff5a5a64));
+                line << juce::String (secs, 3).paddedLeft (' ', 9) << "s   "
+                     << who.paddedRight (' ', 16)
+                     << "  forca " << juce::String (ev.velocity).paddedLeft (' ', 3);
+                monitor.addLine (line, juce::Colour (0xff5fd75f));
             }
         }
 
@@ -1619,16 +1668,25 @@ private:
                 nameLbl, catLbl, noteLbl, soundLbl, volLbl, monitorLbl;
     juce::ComboBox kitBox, soundBox, catBox;
     juce::TextEditor nameEdit;
-    juce::TextButton audioBtn, clearBtn, samplesBtn, addBtn, removeBtn, clearKitBtn;
+    juce::TextButton audioBtn, hwBtn, clearBtn, copyBtn, samplesBtn, addBtn, removeBtn, clearKitBtn;
 
     // Config dos 6 pads físicos do Arduino: sens, thresh, scan, mask, nota, curva, ativo.
+    // 'sens' é o TETO do piezo que vira velocity 127 (HelloDrum: teto = sens*10, ADC 0-1023).
+    // Mais alto = mais dinâmica (batida forte vs fraca espalham mais); baixo demais satura tudo
+    // em 127. 110 (teto ~1100) usa a faixa inteira do ADC. Ajuste fino no painel Config Hardware.
+    // ATIVO (última coluna) = 1 só nos pads com piezo conectado. Pino flutuante
+    // (sem piezo) capta crosstalk/ruído e dispara sozinho — ex.: bumbo fazia o
+    // A2 disparar nota 42. Ligue mais pads no painel Config Hardware ao montá-los.
+    // Valores INICIAIS do painel Config Hardware (não são mais enviados no boot;
+    // a EEPROM da placa manda). sens=25 -> teto 250 (calibrado, sem ruído, velocity
+    // ~16-59); thr=5 -> piso 50; mask=30; curva 0 = linear. Ajuste fino no painel.
     int hw[6][7] = {
-        { 80, 10, 20, 20, 38, 1, 1 },  // caixa (A0)
-        { 80, 10, 20, 20, 36, 1, 1 },  // bumbo (A1)
-        { 80, 10, 20, 20, 42, 1, 1 },  // chimbal (A2)
-        { 80, 10, 20, 20, 48, 1, 0 },  // tom1 (A3)
-        { 80, 10, 20, 20, 45, 1, 0 },  // tom2 (A4)
-        { 80, 10, 20, 20, 49, 1, 0 },  // crash (A5)
+        { 25, 5, 20, 30, 38, 0, 1 },  // caixa (A0)  -> piezo mais forte: teto 250
+        { 14, 5, 20, 30, 36, 0, 1 },  // bumbo (A1)  -> piezo mais fraco (espuma): teto 140
+        { 25, 5, 20, 30, 42, 0, 0 },  // chimbal (A2) -> sem piezo: DESLIGADO
+        { 25, 5, 20, 30, 48, 0, 0 },  // tom1 (A3)
+        { 25, 5, 20, 30, 45, 0, 0 },  // tom2 (A4)
+        { 25, 5, 20, 30, 49, 0, 0 },  // crash (A5)
     };
     std::unique_ptr<juce::FileChooser> chooser;
     juce::Slider master, sens, noteSlider, pieceVol;

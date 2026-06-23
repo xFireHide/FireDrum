@@ -46,7 +46,7 @@ public:
         for (auto& g : pieceGain) g.store (1.0f, std::memory_order_relaxed);
         for (auto& m : pieceMute) m.store (false, std::memory_order_relaxed);
         for (auto& e : pieceEnabled) e.store (true, std::memory_order_relaxed);
-        for (auto& s : pieceSens)    s.store (0.6f, std::memory_order_relaxed);
+        for (auto& s : pieceSens)    s.store (1.5f, std::memory_order_relaxed);
         // Mapa de som identidade: nota tocada usa o próprio sample por padrão.
         for (int i = 0; i < numPieces; ++i)
             soundFor[static_cast<size_t> (i)].store (i, std::memory_order_relaxed);
