@@ -1,0 +1,8 @@
+# Build (CMake + JUCE FetchContent) — nunca versionar artefatos
+build/
+
+# Repo separado do firmware (clonar à parte)
+FireDrum/
+
+# macOS
+.DS_Store
