@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# run.sh — configura, compila e executa a Bateria Eletronica (JUCE standalone).
+# run.sh — configura, compila e executa o FireKit (JUCE standalone).
 #
 # Uso:
 #   ./run.sh              build (Release) e roda
@@ -19,8 +19,8 @@ shopt -s inherit_errexit 2>/dev/null || true
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly SCRIPT_DIR
 readonly BUILD_DIR="${SCRIPT_DIR}/build"
-readonly TARGET="BateriaEletronica"
-readonly PRODUCT_NAME="Bateria Eletronica"
+readonly TARGET="FireKit"
+readonly PRODUCT_NAME="FireKit"
 
 # Defaults configuráveis por flag.
 BUILD_TYPE="Release"
