@@ -1,7 +1,3 @@
-# FireKit
-
-Software de bateria eletrônica que lê o controlador **[FireDrum](https://github.com/xFireHide/FireDrum)** (Arduino) direto pela porta serial e toca os sons na placa de áudio — **sem MIDI virtual e sem DAW**. Escrito em C++ com [JUCE](https://juce.com).
-
 ![FireKit](docs/firekit.png)
 
 Substitui, num único processo, a corrente clássica do Windows
